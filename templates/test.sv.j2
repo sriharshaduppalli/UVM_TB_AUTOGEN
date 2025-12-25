@@ -1,0 +1,20 @@
+class {{ module }}_test extends uvm_test;
+  `uvm_component_utils({{ module }}_test)
+
+  {{ module }}_env env;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    env = {{ module }}_env::type_id::create("env", this);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    phase.raise_objection(this);
+    #1000;
+    phase.drop_objection(this);
+  endtask
+endclass

@@ -1,0 +1,30 @@
+class simple_dut_scoreboard extends uvm_scoreboard;
+  `uvm_component_utils(simple_dut_scoreboard)
+
+  uvm_analysis_export #(simple_dut_seq_item) mon_export;
+  uvm_tlm_fifo #(simple_dut_seq_item) fifo;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    mon_export = new("mon_export", this);
+    fifo = new("fifo", this);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    mon_export.connect(fifo.analysis_export);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    simple_dut_seq_item item;
+    forever begin
+      fifo.get(item);
+      $display("[simple_dut_scoreboard] Received transaction");
+      // Add scoreboarding logic here
+    end
+  endtask
+endclass

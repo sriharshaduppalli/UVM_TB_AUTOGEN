@@ -1,0 +1,6 @@
+interface {{ module }}_if;
+{% for p in ports -%}
+  // {{ p.dir }} {{ p.width }} {{ p.name }}
+  logic {% if p.width %}[{{ p.width }}] {% endif %} {{ p.name }};
+{% endfor %}
+endinterface

@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+setup.cfg
+tests/test_generator.py
+uvm_tbgen/__init__.py
+uvm_tbgen/__main__.py
+uvm_tbgen/cli.py
+uvm_tbgen/generator.py
+uvm_tbgen.egg-info/PKG-INFO
+uvm_tbgen.egg-info/SOURCES.txt
+uvm_tbgen.egg-info/dependency_links.txt
+uvm_tbgen.egg-info/requires.txt
+uvm_tbgen.egg-info/top_level.txt

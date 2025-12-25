@@ -1,0 +1,39 @@
+class {{ module }}_seq_item extends uvm_sequence_item;
+  `uvm_object_utils({{ module }}_seq_item)
+
+  // Input ports (stimulus)
+{%- for p in input_ports %}
+  rand logic{% if p.width > 1 %} [{{ p.width - 1 }}:0]{% endif %} {{ p.name }};
+{%- endfor %}
+
+  // Output ports (observation)
+{%- for p in output_ports %}
+  logic{% if p.width > 1 %} [{{ p.width - 1 }}:0]{% endif %} {{ p.name }};
+{%- endfor %}
+
+  function new(string name = "{{ module }}_seq_item");
+    super.new(name);
+  endfunction
+
+  function void do_copy(uvm_object rhs);
+    {{ module }}_seq_item item;
+    if (!$cast(item, rhs))
+      `uvm_error("COPY", "Failed to cast rhs to {{ module }}_seq_item")
+{%- for p in input_ports %}
+    this.{{ p.name }} = item.{{ p.name }};
+{%- endfor %}
+{%- for p in output_ports %}
+    this.{{ p.name }} = item.{{ p.name }};
+{%- endfor %}
+  endfunction
+
+  function void do_print(uvm_printer printer);
+    super.do_print(printer);
+{%- for p in input_ports %}
+    printer.print_field("{{ p.name }}", this.{{ p.name }}, {{ p.width }});
+{%- endfor %}
+{%- for p in output_ports %}
+    printer.print_field("{{ p.name }}", this.{{ p.name }}, {{ p.width }});
+{%- endfor %}
+  endfunction
+endclass

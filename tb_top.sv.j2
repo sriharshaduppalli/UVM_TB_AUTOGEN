@@ -1,0 +1,19 @@
+`timescale 1ns/1ps
+module {{ topname }};
+  import uvm_pkg::*;
+  `include "uvm_macros.svh"
+
+  // DUT interface
+  {{ module }}_if dut_if();
+
+  // DUT instance
+  {{ module }} dut_inst (
+  {%- for p in ports %}
+    .{{ p.name }}(dut_if.{{ p.name }}){{ "," if not loop.last }}
+  {%- endfor %}
+  );
+
+  initial begin
+    run_test();
+  end
+endmodule

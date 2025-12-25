@@ -1,0 +1,234 @@
+// Auto-generated Checker module for {{ module }}
+// Behavioral and protocol checking
+
+class {{ module }}_checker extends uvm_component;
+  `uvm_component_utils({{ module }}_checker)
+
+  // Virtual interface
+  virtual {{ module }}_if vif;
+
+  // Checkers
+{%- if reset_port %}
+  reset_checker_i reset_chk;
+{%- endif %}
+{%- if has_valid_signal %}
+  protocol_checker_i valid_chk;
+{%- endif %}
+{%- if has_ready_signal %}
+  protocol_checker_i ready_chk;
+{%- endif %}
+
+  // Check count and error tracking
+  int check_count = 0;
+  int error_count = 0;
+  string violation_log[$];
+
+  // Checker properties
+  property p_no_x_on_outputs;
+    @(posedge vif.clk) disable iff(!vif.rst_n)
+    !$isunknown(vif.{{ output_ports[0].name if output_ports else 'valid' }});
+  endproperty
+  a_no_x_on_outputs: assert property(p_no_x_on_outputs)
+    else begin
+      error_count++;
+      violation_log.push_back("X found on output signals");
+    end
+
+{%- if has_valid_signal %}
+  // Valid pulse should be narrow (typically 1-2 cycles)
+  property p_valid_pulse_width;
+    @(posedge vif.clk) disable iff(!vif.rst_n)
+    (vif.valid && !$past(vif.valid)) |-> ##[0:10] (!vif.valid);
+  endproperty
+  a_valid_pulse_width: assert property(p_valid_pulse_width)
+    else begin
+      error_count++;
+      violation_log.push_back("Valid pulse too wide");
+    end
+{%- endif %}
+
+{%- if reset_port %}
+  // Reset should clear all outputs
+  property p_reset_clears_outputs;
+    @(posedge {{ reset_port }})
+{%- for p in output_ports %}
+    ({{ p.name }} == 0) &&
+{%- endfor %}
+    1;
+  endproperty
+  a_reset_clears_outputs: assert property(p_reset_clears_outputs)
+    else begin
+      error_count++;
+      violation_log.push_back("Outputs not cleared after reset");
+    end
+{%- endif %}
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    if (!uvm_config_db#(virtual {{ module }}_if)::get(this, "", "vif", vif))
+      `uvm_fatal("NOVIF", "Virtual interface not configured")
+  endfunction
+
+  virtual function void start_of_simulation_phase(uvm_phase phase);
+    super.start_of_simulation_phase(phase);
+    `uvm_info(get_type_name(), "Starting behavioral checking", UVM_LOW)
+  endfunction
+
+  virtual function void check_reset_sequence();
+    // Monitor reset behavior
+    if (vif.rst_n == 0) begin
+      check_count++;
+      // Verify outputs are cleared
+{%- for p in output_ports %}
+      if (vif.{{ p.name }} != 0) begin
+        error_count++;
+        `uvm_error("CHK_RESET", $sformatf("Output {{ p.name }} not cleared: %0d", vif.{{ p.name }}))
+        violation_log.push_back("{{ p.name }} not cleared");
+      end
+{%- endfor %}
+    end
+  endfunction
+
+  virtual function void check_output_validity();
+    // Verify outputs are valid (not X)
+{%- for p in output_ports %}
+    if ($isunknown(vif.{{ p.name }})) begin
+      error_count++;
+      `uvm_error("CHK_INVALID", "Output {{ p.name }} contains X")
+      violation_log.push_back("X on {{ p.name }}");
+    end
+{%- endfor %}
+  endfunction
+
+{%- if has_valid_signal %}
+  virtual function void check_valid_protocol();
+    // Valid signal should not be stuck high
+    static int valid_high_cycles = 0;
+    
+    if (vif.valid) begin
+      valid_high_cycles++;
+      if (valid_high_cycles > 100) begin
+        error_count++;
+        `uvm_error("CHK_VALID_STUCK", "Valid signal stuck high")
+        violation_log.push_back("Valid stuck high");
+        valid_high_cycles = 0;
+      end
+    end else begin
+      valid_high_cycles = 0;
+    end
+  endfunction
+{%- endif %}
+
+{%- if has_ready_signal %}
+  virtual function void check_ready_protocol();
+    // Ready signal should not be stuck low
+    static int ready_low_cycles = 0;
+    
+    if (!vif.ready) begin
+      ready_low_cycles++;
+      if (ready_low_cycles > 100) begin
+        error_count++;
+        `uvm_error("CHK_READY_STUCK", "Ready signal stuck low")
+        violation_log.push_back("Ready stuck low");
+        ready_low_cycles = 0;
+      end
+    end else begin
+      ready_low_cycles = 0;
+    end
+  endfunction
+{%- endif %}
+
+  virtual function void check_protocol_compliance();
+    check_reset_sequence();
+    check_output_validity();
+{%- if has_valid_signal %}
+    check_valid_protocol();
+{%- endif %}
+{%- if has_ready_signal %}
+    check_ready_protocol();
+{%- endif %}
+  endfunction
+
+  virtual function int get_error_count();
+    return error_count;
+  endfunction
+
+  virtual function int get_check_count();
+    return check_count;
+  endfunction
+
+  virtual function string get_violation_log();
+    string log = "";
+    foreach(violation_log[i]) begin
+      log = {log, violation_log[i], "\n"};
+    end
+    return log;
+  endfunction
+
+  virtual function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(),
+      $sformatf("Checks Performed: %0d | Violations Found: %0d",
+        check_count, error_count), UVM_LOW)
+    if (error_count > 0) begin
+      `uvm_info(get_type_name(), $sformatf("Violations:\n%s", get_violation_log()), UVM_LOW)
+    end
+  endfunction
+
+endclass
+
+// Lightweight checker interface for inline checkers
+module {{ module }}_inline_checker (
+  input clk,
+  input rst_n
+{%- for p in all_ports %}
+{%- if p.name.lower() not in ['clk', 'rst_n', 'reset'] %},
+  input {% if p.width > 1 %}[{{ p.width - 1 }}:0] {% endif %}{{ p.name }}
+{%- endif %}
+{%- endfor %}
+);
+
+  // Parameter checking
+{%- if output_ports %}
+  property p_output_not_x;
+    @(posedge clk) disable iff(!rst_n)
+    !$isunknown({{ output_ports[0].name }});
+  endproperty
+  a_output_not_x: assert property(p_output_not_x)
+    else $error("Output {{ output_ports[0].name }} contains X value");
+{%- endif %}
+
+  // Reset propagation check
+  property p_reset_effect;
+    @(negedge rst_n)
+    rst_n == 0;
+  endproperty
+  a_reset_effect: assert property(p_reset_effect)
+    else $error("Reset signal error");
+
+{%- if has_valid_signal %}
+  // Handshake protocol check
+  property p_valid_not_stuck_check;
+    @(posedge clk) disable iff(!rst_n)
+    valid |-> ##[1:50] !valid;
+  endproperty
+  a_valid_not_stuck_check: assert property(p_valid_not_stuck_check)
+    else $error("Valid signal appears to be stuck");
+{%- endif %}
+
+endmodule
+
+// Coverage and checking integration
+bind {{ module }} {{ module }}_inline_checker checker_inst (
+  .clk(clk),
+  .rst_n(rst_n)
+{%- for p in all_ports %}
+{%- if p.name.lower() not in ['clk', 'rst_n', 'reset'] %},
+  .{{ p.name }}({{ p.name }})
+{%- endif %}
+{%- endfor %}
+);

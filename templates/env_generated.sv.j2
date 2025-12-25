@@ -1,0 +1,22 @@
+class {{ module }}_env extends uvm_env;
+  `uvm_component_utils({{ module }}_env)
+
+  {{ module }}_agent agt;
+  {{ module }}_scoreboard sb;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    agt = {{ module }}_agent::type_id::create("agt", this);
+    sb = {{ module }}_scoreboard::type_id::create("sb", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    // Connect monitor to scoreboard
+    agt.mon.ap.connect(sb.mon_export);
+  endfunction
+endclass

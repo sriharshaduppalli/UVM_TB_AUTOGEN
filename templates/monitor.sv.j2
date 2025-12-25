@@ -1,0 +1,32 @@
+class {{ module }}_monitor extends uvm_monitor;
+  `uvm_component_utils({{ module }}_monitor)
+
+  virtual {{ module }}_if vif;
+  uvm_analysis_port #({{ module }}_seq_item) ap;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    ap = new("ap", this);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    if (!uvm_config_db#(virtual {{ module }}_if)::get(this, "", "vif", vif))
+      `uvm_fatal("NOVIF", "Virtual interface not found")
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    forever begin
+      @(posedge vif.clk);
+      begin
+        {{ module }}_seq_item item = {{ module }}_seq_item::type_id::create("item");
+        // Collect signals from DUT interface
+{%- for p in input_ports %}
+        item.{{ p.name }} = vif.{{ p.name }};
+{%- endfor %}
+        ap.write(item);
+        $display("[{{ module }}_monitor] Observed transaction");
+      end
+    end
+  endtask
+endclass

@@ -1,0 +1,142 @@
+# Universal Makefile for UVM Testbench Simulation
+# Supports: VCS, Modelsim, Xcelium, Vivado Simulator
+#
+# Usage:
+#   make SIM=vcs compile     # Compile with VCS
+#   make SIM=modelsim run    # Run with Modelsim
+#   make SIM=xcelium gui     # Run Xcelium in GUI mode
+#   make clean               # Clean simulation artifacts
+
+SIM ?= vcs
+DUT ?= simple_dut.v
+TOP ?= tb
+SEED ?= 1
+TIMESCALE ?= 1ns/1ps
+
+# Simulator tools
+VCS_COMPILE = vcs -full64 -sverilog -assert svaext -timescale=$(TIMESCALE) +v2k
+VCS_RUN = ./simv
+
+MODELSIM_COMPILE = vlog -sv -work work
+MODELSIM_RUN = vsim -work work $(TOP)
+
+XCELIUM_RUN = xrun -elaborate -64bit -sv -top $(TOP) -timescale $(TIMESCALE)
+
+VIVADO_COMPILE = xvlog -sv --work work
+VIVADO_ELAB = xelab --work work $(TOP)
+VIVADO_RUN = xsim work/$(TOP)
+
+# Source files
+SOURCES = $(wildcard *.sv) $(DUT)
+
+# Default target
+.PHONY: help list compile elaborate run gui clean
+
+help:
+	@echo "Usage: make [target] SIM=<simulator>"
+	@echo ""
+	@echo "Simulators: vcs, modelsim, xcelium, vivado"
+	@echo ""
+	@echo "Targets:"
+	@echo "  make list          - List all simulators and their status"
+	@echo "  make compile       - Compile design"
+	@echo "  make elaborate     - Elaborate design"
+	@echo "  make run           - Run simulation"
+	@echo "  make gui           - Run simulation with GUI"
+	@echo "  make clean         - Clean simulation artifacts"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make SIM=vcs run"
+	@echo "  make SIM=modelsim gui"
+	@echo "  make SIM=xcelium run SEED=123"
+
+list:
+	@echo "Checking for installed simulators..."
+	@which vcs > /dev/null 2>&1 && echo "✓ VCS (Synopsys)" || echo "✗ VCS not found"
+	@which vlog > /dev/null 2>&1 && echo "✓ Modelsim (Mentor)" || echo "✗ Modelsim not found"
+	@which xrun > /dev/null 2>&1 && echo "✓ Xcelium (Cadence)" || echo "✗ Xcelium not found"
+	@which xvlog > /dev/null 2>&1 && echo "✓ Vivado Simulator (Xilinx)" || echo "✗ Vivado Simulator not found"
+
+ifeq ($(SIM), vcs)
+
+compile: $(SOURCES)
+	$(VCS_COMPILE) -top $(TOP) $^
+	@echo "✓ VCS compilation complete"
+
+elaborate: compile
+
+run: elaborate
+	$(VCS_RUN) +UVM_VERBOSITY=UVM_HIGH
+	@echo "✓ VCS simulation complete"
+
+gui: elaborate
+	$(VCS_RUN) -gui +UVM_VERBOSITY=UVM_HIGH
+
+else ifeq ($(SIM), modelsim)
+
+compile: work $(SOURCES)
+	$(MODELSIM_COMPILE) $(SOURCES)
+	@echo "✓ Modelsim compilation complete"
+
+work:
+	vlib work
+	vmap work work
+
+elaborate: compile
+
+run: elaborate
+	$(MODELSIM_RUN) +UVM_VERBOSITY=UVM_HIGH -c -do "run -all; quit"
+	@echo "✓ Modelsim simulation complete"
+
+gui: elaborate
+	$(MODELSIM_RUN) +UVM_VERBOSITY=UVM_HIGH -gui
+
+else ifeq ($(SIM), xcelium)
+
+compile: $(SOURCES)
+
+elaborate: compile
+
+run: $(SOURCES)
+	$(XCELIUM_RUN) -random_seed $(SEED) +UVM_VERBOSITY=UVM_HIGH $^
+	@echo "✓ Xcelium simulation complete"
+
+gui: $(SOURCES)
+	$(XCELIUM_RUN) -gui -random_seed $(SEED) +UVM_VERBOSITY=UVM_HIGH $^
+
+else ifeq ($(SIM), vivado)
+
+compile: work $(SOURCES)
+	$(VIVADO_COMPILE) $(SOURCES)
+	@echo "✓ Vivado compilation complete"
+
+work:
+	mkdir -p work
+
+elaborate: compile
+	$(VIVADO_ELAB)
+	@echo "✓ Vivado elaboration complete"
+
+run: elaborate
+	$(VIVADO_RUN) +UVM_VERBOSITY=UVM_HIGH
+	@echo "✓ Vivado simulation complete"
+
+gui: elaborate
+	$(VIVADO_RUN) -gui +UVM_VERBOSITY=UVM_HIGH
+
+else
+
+compile elaborate run gui:
+	@echo "ERROR: Unknown simulator '$(SIM)'"
+	@echo "Use: SIM=vcs|modelsim|xcelium|vivado"
+	@exit 1
+
+endif
+
+clean:
+	rm -rf work *.log *.wdb *.shm *.vcd *.vpd simv* csrc xcelium.d xsim.dir xsim* vivado*
+	find . -name "*.so" -delete
+	find . -name "*.a" -delete
+	@echo "✓ Cleaned simulation artifacts"
+
+.PHONY: compile elaborate run gui clean help list

@@ -1,0 +1,29 @@
+class {{ module }}_sequencer extends uvm_sequencer #({{ module }}_seq_item);
+  `uvm_component_utils({{ module }}_sequencer)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+endclass
+
+
+class {{ module }}_base_seq extends uvm_sequence #({{ module }}_seq_item);
+  `uvm_object_utils({{ module }}_base_seq)
+
+  function new(string name = "{{ module }}_base_seq");
+    super.new(name);
+  endfunction
+
+  task body();
+    repeat(10) begin
+      {{ module }}_seq_item item = {{ module }}_seq_item::type_id::create("item");
+      start_item(item);
+      // Randomize or set stimulus here
+{%- for p in input_ports %}
+      item.{{ p.name }} = $urandom();
+{%- endfor %}
+      finish_item(item);
+      $display("[{{ module }}_base_seq] Sequence item generated");
+    end
+  endtask
+endclass

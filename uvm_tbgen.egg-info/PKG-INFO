@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: uvm_tbgen
+Version: 0.0.1
+Summary: UVM testbench generator
+Author: sriha
+Requires-Dist: jinja2>=3.0

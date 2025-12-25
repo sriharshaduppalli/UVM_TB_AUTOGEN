@@ -1,0 +1,132 @@
+// Auto-generated SystemVerilog Assertions for {{ module }}
+// These properties verify correct behavior of the DUT
+
+module {{ module }}_assertions(
+  input clk,
+  input rst_n
+{%- for p in all_ports %}
+{%- if p.name.lower() not in ['clk', 'rst_n', 'reset'] %},
+  input {% if p.width > 1 %}[{{ p.width - 1 }}:0] {% endif %}{{ p.name }}
+{%- endif %}
+{%- endfor %}
+);
+
+  // ========== Reset Assertions ==========
+  // After reset, the DUT should be in a known state
+{%- if reset_port %}
+  property p_reset_propagation;
+    @(negedge {{ reset_port }}) |-> @(posedge clk) 1;
+  endproperty
+  a_reset_propagation: assert property(p_reset_propagation)
+    else $error("[{{ module }}_assertions] Reset did not propagate properly");
+{%- endif %}
+
+  // ========== Clock Domain Crossing ==========
+  // Output signals should be stable during the clock period (between clock edges)
+{%- for p in output_ports %}
+  property p_{{ p.name }}_stable;
+    @(posedge clk) $stable({{ p.name }}) |-> 1;
+  endproperty
+  a_{{ p.name }}_stable: assert property(p_{{ p.name }}_stable)
+    else $warning("[{{ module }}_assertions] Output {{ p.name }} is unstable mid-cycle");
+{%- endfor %}
+
+  // ========== Protocol Properties ==========
+{%- if has_valid_signal %}
+  // Valid signal should not remain high forever (avoid deadlock)
+  property p_valid_not_stuck;
+    @(posedge clk) disable iff(!rst_n)
+    valid |-> ##[1:100] !valid;
+  endproperty
+  a_valid_not_stuck: assert property(p_valid_not_stuck)
+    else $warning("[{{ module }}_assertions] Valid signal appears stuck high");
+
+  // When valid is low, monitor should not process data
+  property p_valid_guards_data;
+    @(posedge clk) disable iff(!rst_n)
+    !valid |-> $stable(valid);
+  endproperty
+  a_valid_guards_data: assert property(p_valid_guards_data)
+    else $info("[{{ module }}_assertions] Data valid protocol check");
+{%- endif %}
+
+{%- if has_ready_signal %}
+  // Ready signal should not remain low forever (avoid deadlock)
+  property p_ready_not_stuck;
+    @(posedge clk) disable iff(!rst_n)
+    ready |-> ##[1:100] !ready;
+  endproperty
+  a_ready_not_stuck: assert property(p_ready_not_stuck)
+    else $warning("[{{ module }}_assertions] Ready signal appears stuck low");
+{%- endif %}
+
+  // ========== Data Propagation ==========
+{%- for in_port in input_ports %}
+{%- for out_port in output_ports %}
+{%- if ('data' in in_port.name.lower()) and ('data' in out_port.name.lower()) %}
+  // Input data should eventually appear on output (simple data path)
+  property p_data_flow_{{ in_port.name }}_to_{{ out_port.name }};
+    @(posedge clk) disable iff(!rst_n)
+    ({{ in_port.name }} != 0) |-> ##[1:10] ({{ out_port.name }} != 0);
+  endproperty
+  a_data_flow_{{ in_port.name }}_to_{{ out_port.name }}: assert property(p_data_flow_{{ in_port.name }}_to_{{ out_port.name }})
+    else $warning("[{{ module }}_assertions] Data flow from {{ in_port.name }} to {{ out_port.name }} delayed or missing");
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+  // ========== Output Range Constraints ==========
+{%- for p in output_ports %}
+{%- if p.width <= 8 %}
+  // Output {{ p.name }} should remain within valid range
+  property p_{{ p.name }}_range_valid;
+    @(posedge clk) disable iff(!rst_n)
+    ({{ p.name }} >= 0) && ({{ p.name }} <= {{ 2**p.width - 1 }});
+  endproperty
+  a_{{ p.name }}_range_valid: assume property(p_{{ p.name }}_range_valid)
+    else $warning("[{{ module }}_assertions] Output {{ p.name }} out of range");
+{%- endif %}
+{%- endfor %}
+
+  // ========== Input Constraints ==========
+{%- for p in input_ports %}
+{%- if p.width <= 8 and 'clk' not in p.name.lower() and 'rst' not in p.name.lower() and 'reset' not in p.name.lower() %}
+  // Input {{ p.name }} should remain stable when not changing
+  property p_{{ p.name }}_not_glitching;
+    @(posedge clk) disable iff(!rst_n)
+    ({{ p.name }} == $past({{ p.name }})) |-> $stable({{ p.name }});
+  endproperty
+  a_{{ p.name }}_not_glitching: assume property(p_{{ p.name }}_not_glitching)
+    else $info("[{{ module }}_assertions] Input {{ p.name }} may have glitches");
+{%- endif %}
+{%- endfor %}
+
+  // ========== Mutual Exclusivity ==========
+{%- if multiple_control_signals %}
+  // No two control signals should be active simultaneously
+{%- for sig1 in control_signals %}
+{%- for sig2 in control_signals %}
+{%- if sig1 != sig2 and sig1 < sig2 %}
+  property p_{{ sig1 }}_and_{{ sig2 }}_mutually_exclusive;
+    @(posedge clk) disable iff(!rst_n)
+    ({{ sig1 }} && {{ sig2 }}) == 0;
+  endproperty
+  a_{{ sig1 }}_and_{{ sig2 }}_mutually_exclusive: assert property(p_{{ sig1 }}_and_{{ sig2 }}_mutually_exclusive)
+    else $error("[{{ module }}_assertions] Signals {{ sig1 }} and {{ sig2 }} active simultaneously");
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+{%- endif %}
+
+endmodule
+
+// Bind the assertions module to the DUT instance in testbench
+bind {{ module }} {{ module }}_assertions u_assertions (
+  .clk(clk),
+  .rst_n(rst_n)
+{%- for p in all_ports %}
+{%- if p.name.lower() not in ['clk', 'rst_n', 'reset'] %},
+  .{{ p.name }}({{ p.name }})
+{%- endif %}
+{%- endfor %}
+);

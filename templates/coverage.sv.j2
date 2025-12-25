@@ -1,0 +1,187 @@
+// Auto-generated Coverage module for {{ module }}
+// Functional coverage collection for DUT verification
+
+class {{ module }}_functional_coverage extends uvm_object;
+  `uvm_object_utils({{ module }}_functional_coverage)
+
+  // Virtual interface for coverage collection
+  virtual {{ module }}_if vif;
+
+  // Covergroup for input port values
+{%- for p in input_ports %}
+{%- if p.width <= 8 %}
+  covergroup input_{{ p.name }}_cg;
+    cp_{{ p.name }}: coverpoint vif.{{ p.name }} {
+      bins low = {0};
+      bins mid = {[1:127]};
+      bins high = {255};
+      option.auto_bin_max = 8;
+      option.goal = 50;
+    }
+  endgroup
+{%- endif %}
+{%- endfor %}
+
+  // Covergroup for output port values
+{%- for p in output_ports %}
+{%- if p.width <= 8 %}
+  covergroup output_{{ p.name }}_cg;
+    cp_{{ p.name }}: coverpoint vif.{{ p.name }} {
+      bins low = {0};
+      bins mid = {[1:127]};
+      bins high = {255};
+      option.auto_bin_max = 8;
+      option.goal = 50;
+    }
+  endgroup
+{%- endif %}
+{%- endfor %}
+
+  // Protocol coverage
+{%- if has_valid_signal %}
+  covergroup valid_protocol_cg;
+    cp_valid_pulse: coverpoint vif.valid {
+      bins idle = {0};
+      bins active = {1};
+      option.goal = 100;
+    }
+  endgroup
+{%- endif %}
+
+{%- if has_ready_signal %}
+  covergroup ready_protocol_cg;
+    cp_ready_pulse: coverpoint vif.ready {
+      bins not_ready = {0};
+      bins ready = {1};
+      option.goal = 100;
+    }
+  endgroup
+{%- endif %}
+
+  // Reset coverage
+  covergroup reset_cg;
+    cp_reset: coverpoint vif.rst_n {
+      bins inactive = {1};
+      bins active = {0};
+      option.goal = 100;
+    }
+  endgroup
+
+  // Transition coverage (state changes)
+  covergroup transition_cg;
+    // Track output transitions
+    option.goal = 50;
+  endgroup
+
+  // Total coverage metrics
+  covergroup coverage_metrics_cg;
+    cp_sim_time: coverpoint $time {
+      option.goal = 50;
+    }
+  endgroup
+
+  // Constructor
+  function new(string name = "{{ module }}_functional_coverage");
+    super.new(name);
+{%- for p in input_ports %}
+{%- if p.width <= 8 %}
+    input_{{ p.name }}_cg = new();
+{%- endif %}
+{%- endfor %}
+{%- for p in output_ports %}
+{%- if p.width <= 8 %}
+    output_{{ p.name }}_cg = new();
+{%- endif %}
+{%- endfor %}
+{%- if has_valid_signal %}
+    valid_protocol_cg = new();
+{%- endif %}
+{%- if has_ready_signal %}
+    ready_protocol_cg = new();
+{%- endif %}
+    reset_cg = new();
+    transition_cg = new();
+    coverage_metrics_cg = new();
+  endfunction
+
+  // Function to collect coverage
+  function void collect_coverage();
+{%- for p in input_ports %}
+{%- if p.width <= 8 %}
+    input_{{ p.name }}_cg.sample();
+{%- endif %}
+{%- endfor %}
+{%- for p in output_ports %}
+{%- if p.width <= 8 %}
+    output_{{ p.name }}_cg.sample();
+{%- endif %}
+{%- endfor %}
+{%- if has_valid_signal %}
+    valid_protocol_cg.sample();
+{%- endif %}
+{%- if has_ready_signal %}
+    ready_protocol_cg.sample();
+{%- endif %}
+    reset_cg.sample();
+    transition_cg.sample();
+    coverage_metrics_cg.sample();
+  endfunction
+
+  // Function to get coverage statistics
+  virtual function real get_coverage();
+    real total_coverage = 0;
+    int num_groups = 0;
+
+{%- for p in input_ports %}
+{%- if p.width <= 8 %}
+    total_coverage += input_{{ p.name }}_cg.get_coverage();
+    num_groups++;
+{%- endif %}
+{%- endfor %}
+{%- for p in output_ports %}
+{%- if p.width <= 8 %}
+    total_coverage += output_{{ p.name }}_cg.get_coverage();
+    num_groups++;
+{%- endif %}
+{%- endfor %}
+{%- if has_valid_signal %}
+    total_coverage += valid_protocol_cg.get_coverage();
+    num_groups++;
+{%- endif %}
+{%- if has_ready_signal %}
+    total_coverage += ready_protocol_cg.get_coverage();
+    num_groups++;
+{%- endif %}
+    total_coverage += reset_cg.get_coverage();
+    num_groups++;
+    total_coverage += transition_cg.get_coverage();
+    num_groups++;
+    total_coverage += coverage_metrics_cg.get_coverage();
+    num_groups++;
+
+    return (num_groups > 0) ? total_coverage / num_groups : 0;
+  endfunction
+
+  // Function to print coverage report
+  virtual function void print_coverage();
+    `uvm_info(get_type_name(), $sformatf("Total Coverage: %0.2f%%", get_coverage()), UVM_LOW)
+  endfunction
+
+endclass
+
+// Coverage wrapper for easy instantiation
+class {{ module }}_coverage_wrapper extends uvm_object;
+  `uvm_object_utils({{ module }}_coverage_wrapper)
+
+  {{ module }}_functional_coverage cov;
+
+  function new(string name = "{{ module }}_coverage_wrapper");
+    super.new(name);
+    cov = {{ module }}_functional_coverage::type_id::create("cov");
+  endfunction
+
+  virtual function void set_virtual_interface(virtual {{ module }}_if vif);
+    cov.vif = vif;
+  endfunction
+
+endclass
